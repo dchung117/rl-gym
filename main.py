@@ -1,42 +1,43 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.patches import Patch
-import seaborn as sns
-
 from tqdm import tqdm
 import gymnasium as gym
 
+from agent import BlackJackAgent
+
 if __name__ == "__main__":
+    # hyperparameters
+    lr = 0.01
+    n_episodes = 100_000
+    eps_init = 1.0
+    eps_decay = eps_init / (n_episodes/2)
+    eps_final = 0.1
+
     # blackjack env
     env = gym.make("Blackjack-v1", sab=True, render_mode="rgb_array")
+    n_actions = env.action_space.n
 
-    # reset env
-    done = False
-    obs, info = env.reset() # obs: (user_hand, dealer_faceup, user_has_ace_bool (i.e. 11 w/o busting))
-    print("User total: ", obs[0])
-    print("Dealer face-up: ", obs[1])
-    print("User has usable ace-high?: ", obs[2])
-    print(info)
-    print()
+    agent = BlackJackAgent(n_actions=n_actions, lr=lr, eps_initial=eps_init, eps_decay=eps_decay, eps_final=eps_final)
 
-    # take random action
-    action = env.action_space.sample()
-    obs, reward, terminated, truncated, info = env.step(action)
-    print("User total: ", obs[0])
-    print("Dealer face-up: ", obs[1])
-    print("User has usable ace-high?: ", obs[2])
-    print("Reward: ", reward)
-    print("Game over?: ", terminated)
-    print("Time limit reached?: ", truncated)
-    print(info)
-    print()
-
-    # reset game if over
-    if terminated:
+    # wrapper to track episode statistics for Blackjack
+    env = gym.wrappers.RecordEpisodeStatistics(env, deque_size=n_episodes)
+    for i in tqdm(range(n_episodes)):
+        # reset environment
         obs, info = env.reset()
-        print("Game over. Resetting.")
-        print("User total: ", obs[0])
-        print("Dealer face-up: ", obs[1])
-        print("User has usable ace-high?: ", obs[2])
-        print(info)
-        print()
+        done = False
+
+        while not done:
+            # Take action (epsilon-greedy)
+            action = agent.get_action(obs)
+            next_obs, reward, is_terminated, is_truncated, info = env.step(action)
+
+            # Update agent's Q-table
+            agent.update(obs, action, reward, is_terminated, next_obs)
+
+            # Update done and current observation
+            done = is_terminated or is_truncated
+            obs = next_obs
+
+        # update learning rate
+        agent.decay_eps()
+
+    # Save Q-values and training error
+    agent.save()

@@ -1,3 +1,4 @@
+import pickle
 import numpy as np
 
 class BlackJackAgent(object):
@@ -8,24 +9,24 @@ class BlackJackAgent(object):
     :dtype int
     :param lr - learning rate for updating Q-values
     :dtype float
-    :param initial_eps - initial epsilon hyperparameter for exploration
+    :param eps_initial - initial epsilon hyperparameter for exploration
     :dtype float
     :param eps_decay - rate at which exploration probability decreases during training
     :dtype float
-    :param final_eps - final epsilon hyperparameter for exploration
+    :param eps_final - final epsilon hyperparameter for exploration
     :dtype float
     :param gamma - discount factor to downweight Q-values of future states from current state
     :dtype float
     """
-    def __init__(self, n_actions: int, lr: float, initial_eps: float, eps_decay: float, final_eps: float, gamma: float = 0.95) -> None:
+    def __init__(self, n_actions: int, lr: float, eps_initial: float, eps_decay: float, eps_final: float, gamma: float = 0.95) -> None:
         self.q_values = {}
         self.n_actions = n_actions
         self.lr = lr
         self.gamma = gamma
 
-        self.eps = initial_eps
+        self.eps = eps_initial
         self.eps_decay = eps_decay
-        self.final_eps = final_eps
+        self.eps_final = eps_final
 
         self.training_error = []
 
@@ -41,7 +42,7 @@ class BlackJackAgent(object):
         :rtype int
         """
 
-        if np.random.random() < self.eps:
+        if (np.random.random() < self.eps) or (obs not in self.q_values):
             return np.random.choice(self.n_actions)
 
         return np.argmax(self.q_values[obs])
@@ -64,11 +65,15 @@ class BlackJackAgent(object):
         :rtype None
         """
         # Q-learning update
-        future_q = (not is_terminated)*self.q_values[next_obs].max()
-        td = (reward + self.gamma*future_q - self.q_values[obs][action]) # temporal difference
+        future_q = 0
+        if next_obs in self.q_values:
+            future_q = (not is_terminated)*self.q_values[next_obs].max()
+        td = reward + self.gamma*future_q
+        if obs in self.q_values:
+            td -= self.q_values[obs][action] # temporal difference
 
         if obs not in self.q_values:
-            self.q_values = np.zeros(self.n_actions)
+            self.q_values[obs] = np.zeros(self.n_actions)
         self.q_values[obs][action] = (self.q_values[obs][action] + self.lr * td)
 
         # track td errors
@@ -83,4 +88,28 @@ class BlackJackAgent(object):
         :return None
         :rtype None
         """
-        self.eps = max(self.final_eps, self.eps - self.eps_decay)
+        self.eps = max(self.eps_final, self.eps - self.eps_decay)
+
+    def save(self) -> None:
+        """
+        Save the Q-table and the training errors.
+
+        :return None
+        :rtype None
+        """
+        with open("q_values.pkl", "wb") as f:
+            pickle.dump(self.q_values, f, protocol=pickle.HIGHEST_PROTOCOL)
+        with open("training_error.pkl", "wb") as f:
+            pickle.dump(self.training_error, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def load(self) -> None:
+        """
+        Load the Q-table and the training errors.
+
+        :return None
+        :rtype None
+        """
+        with open("q_values.pkl", "rb") as f:
+            self.q_values = pickle.load(f)
+        with open("training_error.pkl", "rb") as f:
+            self.training_error = pickle.load(f)
