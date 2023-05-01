@@ -1,3 +1,6 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
 from tqdm import tqdm
 import gymnasium as gym
 
@@ -41,3 +44,39 @@ if __name__ == "__main__":
 
     # Save Q-values and training error
     agent.save()
+
+    # Evaluate trained agent
+    # todo: create function to plot evaluation metrics
+    rolling_len = 500
+    fig, axes = plt.subplots(ncols=3, figsize=(10, 5))
+
+    # moving average of reward
+    reward_moving_avg = (
+        np.convolve(
+            np.array(env.return_queue).flatten(), np.ones(rolling_len), mode="valid"
+        )
+    )/rolling_len
+
+    # moving average of episode length
+    episode_length_moving_avg = (
+        np.convolve(
+            np.array(env.length_queue).flatten(), np.ones(rolling_len), mode="same"
+        )
+    )
+
+    # moving average of training error
+    training_error_moving_avg = (
+        np.convolve(
+            np.array(agent.training_error), np.ones(rolling_len), mode="same"
+        )
+    )
+
+    axes[0].plot(range(len(reward_moving_avg)), reward_moving_avg)
+    axes[0].set_title("Episode rewards")
+    axes[1].plot(range(len(episode_length_moving_avg)), episode_length_moving_avg)
+    axes[1].set_title("Episode lengths")
+    axes[2].plot(range(len(training_error_moving_avg)), training_error_moving_avg)
+    axes[2].set_title("Q-learning temporal differences")
+    plt.tight_layout()
+
+    plt.savefig("eval_blackjack_agent.png")
