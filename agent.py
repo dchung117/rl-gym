@@ -1,5 +1,10 @@
 import pickle
 import numpy as np
+import torch
+import torch.optim as optim
+
+from models.qnet import DeepQNetwork
+from models.utils import ReplayBuffer
 
 class BlackJackAgent(object):
     """
@@ -113,3 +118,49 @@ class BlackJackAgent(object):
             self.q_values = pickle.load(f)
         with open("training_error.pkl", "rb") as f:
             self.training_error = pickle.load(f)
+
+class CartPoleAgent(object):
+    """
+    Agent to train and play cartpole game via Deep Q Learning.
+
+    :param: batch_size - size of sample to draw from replay buffer for training.
+    :dtype: int
+    :param: gamma - discount factor
+    :dtype: float
+    :param: eps_init - initial exploration hyperparameter for epsilon-greedy policy training
+    :dtype: float
+    :param: eps_end - final exploration hyperparameter for epsilon-greedy policy training
+    :dtype: float
+    :param: eps_decay - decay factor for epsilon hyperparameter (i.e. larger -> slower decay rate)
+    :dtype: int
+    :param: tau - update rate for Q-target network
+    :dtype: float
+    :param: lr - learning rate of AdamW optimizer
+    :dtype: float
+    :param: n_obs - size of state vector
+    :dtype: int
+    :param: n_actions - number of actions for agent
+    :dtype: int
+    """
+    def __init__(self, batch_size: int, gamma: float, eps_init: float, eps_end: float, eps_decay: int,
+        tau: float, lr: float, n_obs: int, n_actions: int, cuda: bool = False) -> None:
+        self.batch_size = batch_size
+        self.gamma = gamma
+
+        self.eps = eps_init
+        self.eps_end = eps_end
+        self.eps_decay = eps_decay
+
+        self.tau = tau
+
+        self.device = torch.device("cpu")
+        if cuda:
+            self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.q_net = DeepQNetwork(n_obs, n_actions).to(self.device)
+        self.q_net_target = DeepQNetwork(n_obs, n_actions).to(self.device)
+        self.q_net_target.load_state_dict(self.q_net.state_dict())
+
+        self.optim = optim.AdamW(self.q_net.parameters(), lr=lr, amsgrad=True)
+        self.replay_buffer = ReplayBuffer(memory_limit=10000)
+
+        self.n_steps = 0
