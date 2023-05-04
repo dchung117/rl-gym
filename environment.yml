@@ -96,11 +96,40 @@ dependencies:
   - zlib=1.2.13=h5eee18b_0
   - zstd=1.5.5=hc292b87_0
   - pip:
+    - certifi==2022.12.7
+    - charset-normalizer==3.1.0
     - cloudpickle==2.2.1
+    - cmake==3.26.3
     - farama-notifications==0.0.4
+    - filelock==3.12.0
     - gymnasium==0.28.1
+    - idna==3.4
     - jax-jumpy==1.0.0
+    - jinja2==3.1.2
+    - lit==16.0.2
+    - markupsafe==2.1.2
+    - mpmath==1.3.0
+    - networkx==3.1
+    - nvidia-cublas-cu11==11.10.3.66
+    - nvidia-cuda-cupti-cu11==11.7.101
+    - nvidia-cuda-nvrtc-cu11==11.7.99
+    - nvidia-cuda-runtime-cu11==11.7.99
+    - nvidia-cudnn-cu11==8.5.0.96
+    - nvidia-cufft-cu11==10.9.0.58
+    - nvidia-curand-cu11==10.2.10.91
+    - nvidia-cusolver-cu11==11.4.0.1
+    - nvidia-cusparse-cu11==11.7.4.91
+    - nvidia-nccl-cu11==2.14.3
+    - nvidia-nvtx-cu11==11.7.91
+    - pygame==2.1.3
     - pyqt5-sip==12.11.0
+    - requests==2.29.0
+    - sympy==1.11.1
+    - torch==2.0.0
+    - torchaudio==2.0.1
+    - torchvision==0.15.1
     - tqdm==4.65.0
+    - triton==2.0.0
     - typing-extensions==4.5.0
+    - urllib3==1.26.15
 prefix: /home/ubuntu/anaconda3/envs/rl-gym
