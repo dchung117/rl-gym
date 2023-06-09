@@ -245,3 +245,6 @@ class CartPoleAgent(object):
         # clip gradients to 100 (i.e. no exploding gradients)
         torch.nn.utils.clip_grad_value_(self.q_net.parameters(), 100)
         self.optim.step()
+
+    def update_target_net(self):
+        pass
