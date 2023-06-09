@@ -235,7 +235,7 @@ class CartPoleAgent(object):
         # compute expected q-value
         q_value_expected = reward_batch + self.gamma * q_prime_values
 
-        # Huber loss
+        # Huber loss (small updates for low errors, larger updates for higher errors)
         loss = F.smooth_l1_loss(q_values, q_value_expected)
 
         # update q-net
