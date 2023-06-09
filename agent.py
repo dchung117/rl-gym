@@ -135,6 +135,10 @@ class CartPoleAgent(object):
     :dtype: int
     :param: tau - update rate for Q-target network
     :dtype: float
+    :param: n_obs - dimensions of state vector
+    :dtype: int
+    :param: n_actions - number of possible actions
+    :dtype: int
     :param: lr - learning rate of AdamW optimizer
     :dtype: float
     :param: n_obs - size of state vector
@@ -153,6 +157,9 @@ class CartPoleAgent(object):
 
         self.tau = tau
 
+        self.n_obs = n_obs
+        self.n_actions = n_actions
+
         self.device = torch.device("cpu")
         if cuda:
             self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -164,3 +171,24 @@ class CartPoleAgent(object):
         self.replay_buffer = ReplayBuffer(memory_limit=10000)
 
         self.n_steps = 0
+
+    def select_action(self, state: torch.Tensor) -> int:
+        """
+        Take an action given a state vector.
+
+        :param: state - vector representing current game state
+        :dtype: torch.Tensor
+        :return index corresponding to action (left or right)
+        :rtype int
+        """
+        sample = np.random.uniform()
+
+        # compute epsilon threshold for epsilon-greedy policy
+        eps_thresh = self.eps_end + (self.eps_init - self.eps_end) * np.exp(-1*self.n_steps/self.eps_decay)
+        self.n_steps += 1
+
+        if sample < eps_thresh:
+            return torch.tensor(np.random.choice(self.n_actions), dtype=torch.float32).unsqueeze(dim=0)
+        else:
+            with torch.inference_mode():
+                return self.q_net(state).max(dim=1)[1].view(1, 1)
