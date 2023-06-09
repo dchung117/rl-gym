@@ -2,9 +2,10 @@ import pickle
 import numpy as np
 import torch
 import torch.optim as optim
+import torch.nn.functional as F
 
 from models.qnet import DeepQNetwork
-from models.utils import ReplayBuffer
+from models.utils import ReplayBuffer, Transition
 
 class BlackJackAgent(object):
     """
@@ -191,4 +192,56 @@ class CartPoleAgent(object):
             return torch.tensor(np.random.choice(self.n_actions), dtype=torch.float32).unsqueeze(dim=0)
         else:
             with torch.inference_mode():
-                return self.q_net(state).max(dim=1)[1].view(1, 1)
+                return self.q_net(state.to(self.device)).max(dim=1)[1].view(1, 1)
+
+    def train(self) -> None:
+        """
+        Train the Deep Q Network to play the cartpole game.
+
+        :return None
+        :rtype: None
+        """
+        # do not train until large enough memory buffer
+        if len(self.replay_buffer) < self.batch_size:
+            return
+
+        transitions = self.replay_buffer.sample(self.batch_size)
+
+        # convert array of Transitions to single Transition of batch arrays
+        batch = Transition(*zip(*transitions))
+
+        # mask for non-terminal states
+        non_terminable_mask = torch.tensor(
+            tuple(map(lambda x: x is not None, batch.next_state)),
+            device=self.device,
+            dtype=torch.bool
+        )
+
+        next_states = torch.cat(
+            [s for s in batch.next_state if s is not None]
+        )
+        states = torch.cat(batch.state)
+        actions = torch.cat(batch.action)
+        rewards = torch.cat(batch.reward)
+
+        # compute q-values
+        q_values = self.q_net(states.to(self.device)).gather(dim=1, index=actions)
+
+        # compute q-values for next state (q-prime)
+        q_prime_values = torch.zeros(self.batch_size, device=self.device)
+        with torch.inference_mode():
+            q_prime_values[non_terminable_mask] = self.q_net_target(next_states.to(self.device)).max(dim=1)[0]
+
+        # compute expected q-value
+        q_value_expected = reward_batch + self.gamma * q_prime_values
+
+        # Huber loss
+        loss = F.smooth_l1_loss(q_values, q_value_expected)
+
+        # update q-net
+        self.optim.zero_grad()
+        loss.backward()
+
+        # clip gradients to 100 (i.e. no exploding gradients)
+        torch.nn.utils.clip_grad_value_(self.q_net.parameters(), 100)
+        self.optim.step()
