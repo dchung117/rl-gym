@@ -1,4 +1,6 @@
 import pickle
+from typing import Optional
+
 import numpy as np
 import torch
 import torch.optim as optim
@@ -146,13 +148,15 @@ class CartPoleAgent(object):
     :dtype: int
     :param: n_actions - number of actions for agent
     :dtype: int
+    :param: device - optional torch device for gpu acceleration = None
+    :dtype: Optional[torch.device]
     """
     def __init__(self, batch_size: int, gamma: float, eps_init: float, eps_end: float, eps_decay: int,
-        tau: float, lr: float, n_obs: int, n_actions: int, cuda: bool = False) -> None:
+        tau: float, lr: float, n_obs: int, n_actions: int, device: Optional[torch.device]=None) -> None:
         self.batch_size = batch_size
         self.gamma = gamma
 
-        self.eps = eps_init
+        self.eps_init = eps_init
         self.eps_end = eps_end
         self.eps_decay = eps_decay
 
@@ -161,8 +165,9 @@ class CartPoleAgent(object):
         self.n_obs = n_obs
         self.n_actions = n_actions
 
-        self.device = torch.device("cpu")
-        if cuda:
+        if device:
+            self.device = device
+        else:
             self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.q_net = DeepQNetwork(n_obs, n_actions).to(self.device)
         self.q_net_target = DeepQNetwork(n_obs, n_actions).to(self.device)
@@ -185,11 +190,11 @@ class CartPoleAgent(object):
         sample = np.random.uniform()
 
         # compute epsilon threshold for epsilon-greedy policy
-        eps_thresh = self.eps_end + (self.eps_init - self.eps_end) * np.exp(-1*self.n_steps/self.eps_decay)
+        eps_thresh = self.eps_end + (self.eps_init - self.eps_end) * np.exp(-1.0*self.n_steps/self.eps_decay)
         self.n_steps += 1
 
         if sample < eps_thresh:
-            return torch.tensor(np.random.choice(self.n_actions), dtype=torch.float32).unsqueeze(dim=0)
+            return torch.tensor([np.random.choice(self.n_actions)], device=self.device, dtype=torch.int32).unsqueeze(dim=0)
         else:
             with torch.inference_mode():
                 return self.q_net(state.to(self.device)).max(dim=1)[1].view(1, 1)
@@ -233,7 +238,7 @@ class CartPoleAgent(object):
             q_prime_values[non_terminable_mask] = self.q_net_target(next_states.to(self.device)).max(dim=1)[0]
 
         # compute expected q-value
-        q_value_expected = reward_batch + self.gamma * q_prime_values
+        q_value_expected = (rewards.to(self.device) + self.gamma * q_prime_values).reshape(-1, 1)
 
         # Huber loss (small updates for low errors, larger updates for higher errors)
         loss = F.smooth_l1_loss(q_values, q_value_expected)
@@ -246,5 +251,16 @@ class CartPoleAgent(object):
         torch.nn.utils.clip_grad_value_(self.q_net.parameters(), 100)
         self.optim.step()
 
-    def update_target_net(self):
-        pass
+    def update_target_net(self, tau: float) -> None:
+        """
+        Update target Q net w/ weighted average of policy Q net.
+
+        :param tau - weight of policy net to update target net
+        :dtype: float
+        :return: None
+        :rtype: None
+        """
+        policy_state_dict = self.q_net.state_dict()
+        target_state_dict = self.q_net_target.state_dict()
+        for p_name in policy_state_dict:
+            target_state_dict[p_name] = tau*policy_state_dict[p_name] + (1-tau)*target_state_dict[p_name]
